@@ -1,103 +1,309 @@
-import Image from "next/image";
+"use client";
+import React, { useEffect, useState } from "react";
+import {
+  Modal,
+  Form,
+  Input,
+  DatePicker,
+  Layout,
+  Menu,
+  MenuProps,
+  Checkbox,
+  Select,
+  Button,
+} from "antd";
+import dayjs from "dayjs";
+import { PrimaryHeader } from "@/components/common/headers";
+import { CalendarOutlined } from "@ant-design/icons";
 
-export default function Home() {
+import { Calendar, momentLocalizer } from "react-big-calendar";
+import moment from "moment";
+import Sider from "antd/es/layout/Sider";
+import useSWR from "swr";
+import { apiGET, apiPOST } from "@/lib/api_call";
+import { CalendarModel, ExpandEvent } from "@/models";
+import { useWatch } from "antd/es/form/Form";
+import useSWRMutation from "swr/mutation";
+import { useRouter } from "next/navigation";
+
+const localizer = momentLocalizer(moment);
+
+const { Content } = Layout;
+const { RangePicker } = DatePicker;
+
+interface Event {
+  title: string;
+  date: string;
+  description?: string;
+}
+
+export default function HomePage() {
+  const router = useRouter();
+
+  const [currentDate, setCurrentDate] = useState(moment()); // Use moment object
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [activeCalendar, setActiveCalendar] = useState<string>("");
+
+  const [form] = Form.useForm();
+  const watch_relative_weekday =
+    useWatch("relative_weekday", form)?.label ?? "";
+  const watch_recurrence: boolean = useWatch("recurrence", form) ?? false;
+
+  useEffect(() => {
+    console.log(watch_recurrence);
+  }, [watch_recurrence]);
+
+  const years = Array.from({ length: 20 }, (_, i) => moment().year() - 10 + i);
+  const months = moment.months(); // ['January', 'February', ..., 'December']
+
+  const { trigger } = useSWRMutation("/events/", apiPOST);
+
+  const handleYearChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const newYear = parseInt(e.target.value);
+    const updated = currentDate.clone().year(newYear);
+    setCurrentDate(updated);
+  };
+
+  const handleMonthChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const newMonth = parseInt(e.target.value); // 0-indexed
+    const updated = currentDate.clone().month(newMonth);
+    setCurrentDate(updated);
+  };
+
+  const handleOk = () => {
+    form
+      .validateFields()
+      .then((values) => {
+        const newEvent: Event = {
+          ...values,
+          // date: values.date.format("YYYY-MM-DD"),
+          start_datetime: values?.date[0],
+          end_datetime: values?.date[1],
+          relative_weekday: values?.relative_weekday?.value,
+          calendar: Number(activeCalendar),
+        };
+
+        trigger(newEvent);
+        setIsModalOpen(false);
+        form.resetFields();
+      })
+      .catch((err) => console.log(err));
+  };
+
+  const { data: calendarsData } = useSWR<CalendarModel[], Error>(
+    "calendars/",
+    apiGET
+  );
+  const { data: eventsData } = useSWR<ExpandEvent[], Error>(
+    `calendars/${activeCalendar}/expand`,
+    apiGET
+  );
+  const calendars = (calendarsData ?? []).map((c) => ({
+    key: c.id,
+    icon: React.createElement(CalendarOutlined),
+    label: c.name,
+  }));
+
+  const onCalendarClick: MenuProps["onClick"] = (e) => {
+    if (e.key != undefined) setActiveCalendar(e?.key);
+  };
+
   return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm/6 text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-[family-name:var(--font-geist-mono)] font-semibold">
-              app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+    <>
+      <PrimaryHeader onCreateEvent={() => setIsModalOpen(true)} />
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+      <Layout className="min-h-screen bg-gray-50">
+        <Sider width="25%">
+          <Menu
+            theme="dark"
+            mode="inline"
+            selectedKeys={[activeCalendar]}
+            items={calendars ?? []}
+            onClick={onCalendarClick}
+          />
+
+          <Button
+            onClick={() => {
+              localStorage.clear();
+              router.push("/sign-in");
+            }}
           >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+            Logout
+          </Button>
+        </Sider>
+        <Content className="p-8">
+          {/* Dropdowns */}
+          <div style={{ marginBottom: 10 }}>
+            <select value={currentDate.month()} onChange={handleMonthChange}>
+              {months.map((month, idx) => (
+                <option key={month} value={idx}>
+                  {month}
+                </option>
+              ))}
+            </select>
+
+            <select value={currentDate.year()} onChange={handleYearChange}>
+              {years.map((year) => (
+                <option key={year} value={year}>
+                  {year}
+                </option>
+              ))}
+            </select>
+          </div>
+          <Calendar<ExpandEvent>
+            localizer={localizer}
+            events={eventsData ?? []}
+            startAccessor="start"
+            endAccessor="end"
+            style={{ height: 500 }}
+            date={currentDate.toDate()}
+            onNavigate={(date) => setCurrentDate(moment(date))}
+            defaultView="month"
+          />
+        </Content>
+      </Layout>
+
+      <Modal
+        title="Add Event"
+        open={isModalOpen}
+        onOk={handleOk}
+        onCancel={() => setIsModalOpen(false)}
+        okText="Save"
+      >
+        <Form
+          layout="vertical"
+          form={form}
+          initialValues={{
+            date: [dayjs(), dayjs()],
+            recurrence: false,
+            relative_weekday: 0,
+            relative_week_number: 0,
+          }}
+        >
+          <Form.Item
+            name="name"
+            label="Event Title"
+            rules={[{ required: true }]}
           >
-            Read our docs
-          </a>
-        </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
-    </div>
+            <Input placeholder="e.g. Team Meeting" />
+          </Form.Item>
+          <Form.Item name="description" label="Description">
+            <Input.TextArea rows={3} placeholder="Optional details" />
+          </Form.Item>
+          <Form.Item name="date" label="Date" rules={[{ required: true }]}>
+            <RangePicker showTime className="w-full" />
+          </Form.Item>
+          <Form.Item
+            name="recurrence"
+            label="Recurring"
+            valuePropName="checked"
+          >
+            <Checkbox>Recurrence</Checkbox>
+          </Form.Item>
+
+          {watch_recurrence && (
+            <>
+              <Form.Item
+                name="freq"
+                label="Frequency"
+                rules={[{ required: true }]}
+              >
+                <Select
+                  defaultValue="daily"
+                  style={{ width: "100%" }}
+                  options={[
+                    { value: "daily", label: "Daily" },
+                    { value: "weekly", label: "Weekly" },
+                    { value: "monthly", label: "Monthly" },
+                    { value: "yearly", label: "Yearly" },
+                  ]}
+                />
+              </Form.Item>
+            </>
+          )}
+
+          {useWatch("freq", form) == "monthly" ? (
+            <>
+              <Form.Item
+                name="relative_weekday"
+                label="Weekday Selection(Every week day)"
+                rules={[{ required: true }]}
+              >
+                <Select
+                  defaultValue={0}
+                  style={{ width: "100%" }}
+                  labelInValue
+                  options={[
+                    { value: 0, label: "Monday" },
+                    { value: 1, label: "Tuesday" },
+                    { value: 2, label: "Wednesday" },
+                    { value: 3, label: "Thursday" },
+                    { value: 4, label: "Friday" },
+                    { value: 5, label: "Saturday" },
+                    { value: 6, label: "Sunday" },
+                  ]}
+                />
+              </Form.Item>
+
+              <Form.Item
+                name="relative_week_number"
+                label="Relative week number(Every week day)"
+              >
+                <Select
+                  defaultValue={0}
+                  style={{ width: "100%" }}
+                  options={[
+                    {
+                      value: 0,
+                      label: `Every month's ${watch_relative_weekday}`,
+                    },
+                    {
+                      value: 1,
+                      label: `Every month's 1st ${watch_relative_weekday}`,
+                    },
+                    {
+                      value: 2,
+                      label: `Every month's 2nd ${watch_relative_weekday}`,
+                    },
+                    {
+                      value: 3,
+                      label: `Every month's 3rd ${watch_relative_weekday}`,
+                    },
+                    {
+                      value: 4,
+                      label: `Every month's last ${watch_relative_weekday}`,
+                    },
+                  ]}
+                />
+              </Form.Item>
+            </>
+          ) : (
+            <>
+              {watch_recurrence && (
+                <Form.Item
+                  name="interval"
+                  label="Interval"
+                  rules={[{ required: true, min: 1, max: 365 }]}
+                  style={{ width: "100%" }}
+                >
+                  <Input
+                    type="number"
+                    step={1}
+                    min={1}
+                    max={365}
+                    width={"100%"}
+                    style={{ width: "100%" }}
+                  />
+                </Form.Item>
+              )}
+            </>
+          )}
+
+          <Form.Item name="recurrence_end_date" label="Recurrence End Date">
+            <DatePicker style={{ width: "100%" }} />
+          </Form.Item>
+        </Form>
+      </Modal>
+    </>
   );
 }

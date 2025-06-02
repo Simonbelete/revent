@@ -6,10 +6,10 @@ from presentation import views
 router = routers.DefaultRouter()
 
 router.register(
-    r'',
+    r'calendars',
     viewset=views.CalendarViewSet,
     )
 
 urlpatterns = [
-    path('calendars', include(router.urls)),
+    path('', include(router.urls)),
 ]

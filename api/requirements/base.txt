@@ -1,5 +1,7 @@
 Django
 djangorestframework
+djangorestframework-simplejwt
 mypy 
 django-stubs 
 djangorestframework-stubs
+python-dateutil
