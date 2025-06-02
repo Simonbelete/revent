@@ -1,12 +1,8 @@
----
-
 ## 🧠 Clean Architecture Principles
 
 - **Domain Layer** should have no dependencies on infrastructure or presentation.
 - **Infrastructure Layer** implements interfaces defined in the domain.
 - **Presentation Layer** depends on domain/use cases but not infrastructure directly.
-
----
 
 ## 📁 Folder Structure
 
@@ -41,8 +37,6 @@
 - **Testable** – business logic is isolated and easy to test
 - **Maintainable** – clear separation of concerns
 
----
-
 ## 🚀 Getting Started
 
 1. **Clone the repository**
@@ -51,8 +45,6 @@
 3. **Run the docker containers**
    (`docker compose up`)
 4. **Frontend run on port 3000 & api runs on port 8000**
-
----
 
 ## TODO:
 
